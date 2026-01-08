@@ -65,6 +65,25 @@ export default function StartAssessmentPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-10 p-12 md:p-14 bg-white">
+          {/* PDF Upload Option */}
+          <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-300 rounded-2xl p-8 text-center hover:shadow-lg transition-shadow">
+            <h3 className="text-2xl font-bold text-purple-700 mb-3">📄 Document-Based Assessment</h3>
+            <p className="text-gray-700 mb-6">
+              Upload a PDF document to analyze its content and test your understanding with AI-generated questions
+            </p>
+            <Button
+              onClick={() => router.push('/upload')}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-3 text-lg font-semibold shadow-lg"
+            >
+              Upload PDF & Start
+            </Button>
+          </div>
+
+          <div className="text-center text-gray-500 font-medium">
+            — OR —
+          </div>
+
+          {/* Domain Selection */}
           <div className="space-y-9">
           <div className="space-y-4">
               <label className="block text-base font-medium text-gray-700 tracking-wide">

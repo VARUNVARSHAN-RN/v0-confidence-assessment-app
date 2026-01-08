@@ -11,10 +11,11 @@ import {
 } from "@/lib/confidence-scorer"
 import { generateConfidenceProfile, type MLConfidenceProfile } from "@/lib/ml-confidence-scorer"
 import { extractFeatures, type BehavioralFeatures } from "@/lib/feature-extractor"
+import { computeDifficultyAwareAnalytics, type DifficultyAwareAnalytics } from "@/lib/difficulty-aware-scorer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowUp, ArrowDown, Minus } from "lucide-react"
+import { ArrowUp, ArrowDown, Minus, Target, Brain, Zap, TrendingUp } from "lucide-react"
 
 export default function ResultsPage() {
   const params = useParams()
@@ -22,6 +23,7 @@ export default function ResultsPage() {
   const { state, reset } = useAssessment()
   const [isLoading, setIsLoading] = useState(true)
   const [mlProfile, setMLProfile] = useState<MLConfidenceProfile | null>(null)
+  const [difficultyAnalytics, setDifficultyAnalytics] = useState<DifficultyAwareAnalytics | null>(null)
 
   useEffect(() => {
     // Verify we have results to show
@@ -44,7 +46,7 @@ export default function ResultsPage() {
         
         return {
           response_time: response.total_time,
-          revisions: 0, // not tracked yet in current context
+          revisions: response.revisions || 0,
           explanation_length: response.user_answer?.length || 0,
           explanation_depth: (depthMap[difficulty as keyof typeof depthMap] || "medium") as any,
           concept_coverage: 50, // placeholder
@@ -58,6 +60,10 @@ export default function ResultsPage() {
       const correctnessRates = state.responses.map(r => r.is_correct ? 1 : 0)
       const profile = generateConfidenceProfile(features, correctnessRates)
       setMLProfile(profile)
+
+      // Generate difficulty-aware analytics
+      const analytics = computeDifficultyAwareAnalytics(state.responses, state.questions)
+      setDifficultyAnalytics(analytics)
     }
     
     setIsLoading(false)
@@ -196,7 +202,7 @@ export default function ResultsPage() {
                   {mlProfile.confidence_trend === "declining" && (
                     <span className="flex items-center gap-1 text-red-600">
                       <ArrowDown className="w-4 h-4" />
-                      Declining
+                      Needs Attention
                     </span>
                   )}
                   {mlProfile.confidence_trend === "stable" && (
@@ -210,16 +216,11 @@ export default function ResultsPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Overall ML Score */}
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-lg">
-                <div className="text-center">
-                  <p className="text-sm font-medium text-gray-600 mb-2">ML-Based Overall Confidence</p>
-                  <div className="text-5xl font-bold text-purple-600">
-                    {mlProfile.overall_score}
-                  </div>
-                  <p className="text-sm text-gray-600 mt-2">
-                    Calculated from behavioral patterns and performance consistency
-                  </p>
+              <div className="text-center p-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
+                <div className="text-5xl font-bold text-purple-600">
+                  {mlProfile.overall_score}
                 </div>
+                <div className="text-sm text-gray-600 mt-2">Multi-Dimensional Confidence</div>
               </div>
 
               {/* Dimension Cards */}
@@ -227,22 +228,22 @@ export default function ResultsPage() {
                 {mlProfile.dimensions.map((dimension) => {
                   const labelColor =
                     dimension.label === "Strong"
-                      ? "text-green-600 bg-green-50"
+                      ? "bg-green-100 text-green-800"
                       : dimension.label === "Moderate"
-                        ? "text-blue-600 bg-blue-50"
-                        : "text-orange-600 bg-orange-50"
+                      ? "bg-blue-100 text-blue-800"
+                      : "bg-orange-100 text-orange-800"
 
                   const barColor =
                     dimension.label === "Strong"
                       ? "bg-green-500"
                       : dimension.label === "Moderate"
-                        ? "bg-blue-500"
-                        : "bg-orange-500"
+                      ? "bg-blue-500"
+                      : "bg-orange-500"
 
                   return (
-                    <Card key={dimension.name} className="p-4">
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-start">
+                    <Card key={dimension.name} className="border border-gray-200 hover:shadow-md transition-shadow">
+                      <div className="p-4 space-y-3">
+                        <div className="flex justify-between items-center">
                           <h3 className="font-semibold text-gray-800">{dimension.name}</h3>
                           <Badge className={labelColor}>{dimension.label}</Badge>
                         </div>
@@ -291,6 +292,267 @@ export default function ResultsPage() {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Difficulty-Aware Analysis */}
+        {difficultyAnalytics && (
+          <>
+            {/* Difficulty Breakdown */}
+            <Card className="shadow-lg border-l-4 border-blue-500">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="w-6 h-6 text-blue-600" />
+                  Difficulty-Based Performance
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Overall Understanding Level */}
+                <div className="text-center p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-300">
+                  <div className="text-sm text-gray-600 mb-2">Understanding Level</div>
+                  <div className="text-4xl font-bold text-blue-700 mb-2">
+                    {difficultyAnalytics.overall_understanding_level.toUpperCase().replace("-", " ")}
+                  </div>
+                  <Badge
+                    variant={
+                      difficultyAnalytics.overall_understanding_level === "job-ready"
+                        ? "default"
+                        : difficultyAnalytics.overall_understanding_level === "improving"
+                        ? "secondary"
+                        : "outline"
+                    }
+                    className="text-base px-4 py-1"
+                  >
+                    {difficultyAnalytics.overall_understanding_level === "job-ready" && "🎯 Industry Ready"}
+                    {difficultyAnalytics.overall_understanding_level === "improving" && "📈 Progressing Well"}
+                    {difficultyAnalytics.overall_understanding_level === "beginner" && "🌱 Building Foundation"}
+                  </Badge>
+                </div>
+
+                {/* Difficulty Score Cards */}
+                <div className="grid md:grid-cols-3 gap-4">
+                  {/* Easy */}
+                  <Card className="border-2 border-green-200 hover:shadow-lg transition-shadow">
+                    <CardContent className="p-6 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 bg-green-100 rounded-lg">
+                            <Brain className="w-5 h-5 text-green-600" />
+                          </div>
+                          <h3 className="font-semibold text-gray-800">Easy</h3>
+                        </div>
+                        <Badge className="bg-green-100 text-green-800">
+                          {difficultyAnalytics.easy.total_questions} Qs
+                        </Badge>
+                      </div>
+                      
+                      <div className="text-center">
+                        <div className="text-4xl font-bold text-green-600">
+                          {Math.round(difficultyAnalytics.easy.accuracy)}%
+                        </div>
+                        <div className="text-xs text-gray-500">Accuracy</div>
+                      </div>
+
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="h-full bg-green-500 rounded-full transition-all duration-500"
+                          style={{ width: `${difficultyAnalytics.easy.accuracy}%` }}
+                        ></div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-2 text-xs text-gray-600">
+                        <div>
+                          <div className="font-semibold">{difficultyAnalytics.easy.correct}/{difficultyAnalytics.easy.total_questions}</div>
+                          <div>Correct</div>
+                        </div>
+                        <div>
+                          <div className="font-semibold">{Math.round(difficultyAnalytics.easy.avg_time)}s</div>
+                          <div>Avg Time</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Moderate */}
+                  <Card className="border-2 border-blue-200 hover:shadow-lg transition-shadow">
+                    <CardContent className="p-6 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 bg-blue-100 rounded-lg">
+                            <Target className="w-5 h-5 text-blue-600" />
+                          </div>
+                          <h3 className="font-semibold text-gray-800">Moderate</h3>
+                        </div>
+                        <Badge className="bg-blue-100 text-blue-800">
+                          {difficultyAnalytics.moderate.total_questions} Qs
+                        </Badge>
+                      </div>
+                      
+                      <div className="text-center">
+                        <div className="text-4xl font-bold text-blue-600">
+                          {Math.round(difficultyAnalytics.moderate.accuracy)}%
+                        </div>
+                        <div className="text-xs text-gray-500">Accuracy</div>
+                      </div>
+
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                          style={{ width: `${difficultyAnalytics.moderate.accuracy}%` }}
+                        ></div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-2 text-xs text-gray-600">
+                        <div>
+                          <div className="font-semibold">{difficultyAnalytics.moderate.correct}/{difficultyAnalytics.moderate.total_questions}</div>
+                          <div>Correct</div>
+                        </div>
+                        <div>
+                          <div className="font-semibold">{Math.round(difficultyAnalytics.moderate.avg_time)}s</div>
+                          <div>Avg Time</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Hard */}
+                  <Card className="border-2 border-purple-200 hover:shadow-lg transition-shadow">
+                    <CardContent className="p-6 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 bg-purple-100 rounded-lg">
+                            <Zap className="w-5 h-5 text-purple-600" />
+                          </div>
+                          <h3 className="font-semibold text-gray-800">Hard</h3>
+                        </div>
+                        <Badge className="bg-purple-100 text-purple-800">
+                          {difficultyAnalytics.hard.total_questions} Qs
+                        </Badge>
+                      </div>
+                      
+                      <div className="text-center">
+                        <div className="text-4xl font-bold text-purple-600">
+                          {Math.round(difficultyAnalytics.hard.accuracy)}%
+                        </div>
+                        <div className="text-xs text-gray-500">Accuracy</div>
+                      </div>
+
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="h-full bg-purple-500 rounded-full transition-all duration-500"
+                          style={{ width: `${difficultyAnalytics.hard.accuracy}%` }}
+                        ></div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-2 text-xs text-gray-600">
+                        <div>
+                          <div className="font-semibold">{difficultyAnalytics.hard.correct}/{difficultyAnalytics.hard.total_questions}</div>
+                          <div>Correct</div>
+                        </div>
+                        <div>
+                          <div className="font-semibold">{Math.round(difficultyAnalytics.hard.avg_time)}s</div>
+                          <div>Avg Time</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Interpretation */}
+                <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
+                  <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-blue-600" />
+                    Performance Interpretation
+                  </h3>
+                  <p className="text-gray-700 leading-relaxed text-lg">
+                    {difficultyAnalytics.interpretation}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Concept Mastery */}
+            {difficultyAnalytics.concept_mastery.length > 0 && (
+              <Card className="shadow-lg border-l-4 border-indigo-500">
+                <CardHeader>
+                  <CardTitle>Concept Mastery Map</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {difficultyAnalytics.concept_mastery.map((concept, idx) => {
+                      const statusColor =
+                        concept.status === "mastered"
+                          ? "bg-green-100 text-green-800 border-green-300"
+                          : concept.status === "partially-understood"
+                          ? "bg-blue-100 text-blue-800 border-blue-300"
+                          : "bg-orange-100 text-orange-800 border-orange-300"
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`p-4 rounded-lg border-2 ${statusColor} hover:shadow-md transition-shadow`}
+                        >
+                          <div className="flex justify-between items-start mb-3">
+                            <h4 className="font-semibold text-gray-800">{concept.concept}</h4>
+                            <Badge className={statusColor}>
+                              {concept.status.replace("-", " ").toUpperCase()}
+                            </Badge>
+                          </div>
+
+                          <div className="grid grid-cols-4 gap-3 text-sm">
+                            <div>
+                              <div className="text-xs text-gray-600">Overall</div>
+                              <div className="font-bold text-lg">{Math.round(concept.overall_score)}%</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-600">Easy</div>
+                              <div className="font-semibold">{Math.round(concept.easy_score)}%</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-600">Moderate</div>
+                              <div className="font-semibold">{Math.round(concept.moderate_score)}%</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-600">Hard</div>
+                              <div className="font-semibold">{Math.round(concept.hard_score)}%</div>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="h-full bg-gradient-to-r from-green-400 to-blue-500 rounded-full transition-all duration-500"
+                              style={{ width: `${concept.overall_score}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Personalized Recommendations */}
+            <Card className="shadow-lg bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-300">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="w-6 h-6 text-indigo-600" />
+                  Personalized Recommendations
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  {difficultyAnalytics.recommendations.map((rec, idx) => (
+                    <li key={idx} className="flex items-start gap-3 p-4 bg-white rounded-lg shadow-sm border border-indigo-200">
+                      <div className="flex-shrink-0 w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold">
+                        {idx + 1}
+                      </div>
+                      <p className="text-gray-800 leading-relaxed pt-1">{rec}</p>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          </>
         )}
 
         {/* Topic Breakdown */}

@@ -1,4 +1,5 @@
 from app.services.gemini_analyzer import call_gemini
+from app.services.question_validator import validate_and_fix_question
 import json
 import re
 import uuid
@@ -571,9 +572,44 @@ def generate_batch_questions(domain: str, count: int = 10, difficulty: str = "mo
         segments = [None] * count
     
     for idx, (topic, diff, segment) in enumerate(zip(selected_topics, difficulties, segments)):
-        question = generate_question_with_answer(domain, topic, diff, segment)
-        questions.append(question)
-        print(f"[BATCH] Generated {idx + 1}/{count}: {topic} (difficulty={diff})")
+        max_retries = 3
+        question = None
+        
+        for attempt in range(max_retries):
+            try:
+                question = generate_question_with_answer(domain, topic, diff, segment)
+                
+                # Validate and auto-fix the question
+                is_valid, fixed_question, error = validate_and_fix_question(question)
+                
+                if is_valid:
+                    questions.append(fixed_question)
+                    print(f"[BATCH] Generated {idx + 1}/{count}: {topic} (difficulty={diff}, segment={fixed_question.get('segment')})")
+                    break
+                else:
+                    print(f"[BATCH] Validation failed (attempt {attempt + 1}/{max_retries}): {error}")
+                    if attempt < max_retries - 1:
+                        print(f"[BATCH] Regenerating question for {topic}...")
+                    else:
+                        # Use the fixed version anyway on last attempt
+                        print(f"[BATCH] Using auto-fixed question despite validation warning")
+                        questions.append(fixed_question)
+            except Exception as e:
+                print(f"[BATCH] Generation error (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt == max_retries - 1:
+                    # On final attempt, create a simple fallback
+                    print(f"[BATCH] Using fallback question for {topic}")
+                    fallback = {
+                        "question_id": str(uuid.uuid4()),
+                        "question": f"Explain the key concepts of {topic} in {domain}.",
+                        "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"],
+                        "correct_answer": "A",
+                        "topic": topic,
+                        "difficulty": diff,
+                        "segment": "MCQ" if diff != "hard" else ("MCQ_REASONING" if segment == "A" else "ASSERTION_REASON"),
+                        "reasoning_required": (diff == "hard" and segment == "A"),
+                    }
+                    questions.append(fallback)
     
     return questions
 
