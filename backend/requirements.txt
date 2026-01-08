@@ -3,3 +3,5 @@ flask-cors
 python-dotenv
 requests
 PyPDF2
+google-cloud-documentai
+google-cloud-aiplatform

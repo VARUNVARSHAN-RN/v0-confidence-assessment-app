@@ -11,7 +11,12 @@ from app.services.session_store import (
 
 from app.services.question_generator import generate_question, generate_batch_questions
 from app.services.gemini_analyzer import analyze_response
-from app.services.pdf_parser import extract_text_from_pdf_bytes, parse_document
+from app.services.pdf_parser import (
+    extract_text_from_pdf_bytes,
+    parse_document,
+    build_structured_summary,
+    extract_text_prefer_document_ai,
+)
 from app.services.concept_extractor import extract_concepts
 from app.services.explanation_engine import explain_concept
 from app.services.confidence_engine import evaluate_concept
@@ -21,12 +26,14 @@ assessment_bp = Blueprint("assessment", __name__)
 @assessment_bp.route("/ingest", methods=["POST"])
 def ingest_content():
     """Ingest PDF or raw text and return topics/concepts."""
+    summary_source = ""
     if "pdf" in request.files:
         pdf_file = request.files["pdf"]
-        text = extract_text_from_pdf_bytes(pdf_file.read())
+        text, summary_source = extract_text_prefer_document_ai(pdf_file.read())
     else:
         payload = request.get_json(silent=True) or {}
         text = payload.get("text", "")
+        summary_source = "raw_text"
 
     if not text:
         return jsonify({"error": "No content provided"}), 400
@@ -35,7 +42,19 @@ def ingest_content():
     # Add lightweight summaries via concept extractor
     concepts = extract_concepts(text)
     parsed["concepts"] = concepts
-    return jsonify({"success": True, **parsed})
+
+    summary = None
+    try:
+        from app.services.vertex_summarizer import summarize_text
+
+        summary = summarize_text(text)
+        summary["source"] = "vertex_ai"
+    except Exception as e:
+        print(f"[Vertex] Summarization fallback to heuristic: {e}")
+        summary = build_structured_summary(text, parsed.get("topics", []), concepts)
+        summary["source"] = summary_source or "heuristic"
+
+    return jsonify({"success": True, **parsed, "summary": summary})
 
 
 @assessment_bp.route("/explain", methods=["POST"])

@@ -1,0 +1,7 @@
+import os
+
+PROJECT_ID = os.getenv("GOOGLE_PROJECT_ID")
+DOC_AI_LOCATION = os.getenv("DOCUMENT_AI_LOCATION", "us")
+DOC_AI_PROCESSOR_ID = os.getenv("DOCUMENT_AI_PROCESSOR_ID")
+VERTEX_LOCATION = os.getenv("VERTEX_LOCATION", "us-central1")
+VERTEX_API_KEY = os.getenv("VERTEX_API_KEY")

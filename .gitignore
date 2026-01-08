@@ -19,6 +19,10 @@ yarn-error.log*
 # env files
 .env*
 
+# secrets (service account keys, etc.)
+/.secrets/
+/Confidence Checker.json
+
 # vercel
 .vercel
 
